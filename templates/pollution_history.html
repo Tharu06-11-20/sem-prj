@@ -1,0 +1,73 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pollution History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #eef7f8;
+            padding: 25px;
+            color: #183b46;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        .record {
+            background: white;
+            padding: 18px;
+            margin-bottom: 18px;
+            border-radius: 10px;
+        }
+        img {
+            max-width: 100%;
+            width: 350px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Marine Pollution History</h1>
+
+    {% if history %}
+        {% for entry in history %}
+            <div class="record">
+                <h3>Detection #{{ entry.record.id }}</h3>
+                <p>Date: {{ entry.record.created_at }}</p>
+                <p>Objects detected: {{ entry.record.detected_count }}</p>
+
+                <img
+                    src="{{ url_for('static',
+                    filename=entry.record.result_image) }}"
+                    alt="Pollution detection result">
+                {% if entry.record.result_image %}
+                    <p><a href="{{ url_for('download_detection_result', record_type='pollution', record_id=entry.record.id) }}">Download Result</a></p>
+                {% endif %}
+
+                <h4>Detected objects</h4>
+                {% if entry.items %}
+                    {% for item in entry.items %}
+                        <p>
+                            {{ item.class_name }}
+                            — {{ item.confidence }}% confidence
+                        </p>
+                    {% endfor %}
+                {% else %}
+                    <p>No pollution objects were detected.</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>No pollution detection records yet.</p>
+    {% endif %}
+
+    <a href="{{ url_for('pollution_detect') }}">Detect Pollution</a>
+    <br><br>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</div>
+</body>
+</html>

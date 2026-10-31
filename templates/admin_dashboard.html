@@ -1,0 +1,192 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineVision | Admin Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+        header {
+            padding: 20px 5%;
+            background: #075985;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        header h1 { margin-bottom: 8px; }
+        main { padding: 24px 5%; }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 15px;
+        }
+        .card, section {
+            background: white;
+            padding: 18px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #0001;
+        }
+        .number { font-size: 28px; font-weight: bold; color: #075985; }
+        h2 { color: #075985; }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            overflow-wrap: anywhere;
+        }
+        th { background: #e0f2fe; }
+        .profile-link {
+            display: inline-block;
+            background: #075985;
+            color: white;
+            padding: 8px 11px;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+        .logout { color: white; margin-left: 10px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>MarineVision Admin Dashboard</h1>
+        <p>Welcome, {{ name }}</p>
+    </div>
+    <nav>
+        <a class="profile-link" href="{{ url_for('my_profile') }}">My Profile</a>
+        <a class="logout" href="{{ url_for('admin_logout') }}">Sign Out</a>
+    </nav>
+</header>
+
+<main>
+
+    <div class="cards">
+        <div class="card">
+            <p>Registered Users</p>
+            <div class="number">{{ users|length }}</div>
+        </div>
+        <div class="card">
+            <p>Organism Detections</p>
+            <div class="number">{{ detections|length }}</div>
+        </div>
+        <div class="card">
+            <p>Pollution Records</p>
+            <div class="number">{{ pollution|length }}</div>
+        </div>
+    </div>
+
+    <section>
+        <h2>Registered Users</h2>
+        {% if users %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user["id"] }}</td>
+                        <td>{{ user["name"] }}</td>
+                        <td>{{ user["email"] }}</td>
+                        <td>{{ user["username"] }}</td>
+                        <td>{{ user["role"] }}</td>
+                        <td>
+                            <a class="profile-link"
+                               href="{{ url_for('admin_user_profile', user_id=user['id']) }}">
+                                View Profile
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p>No users found.</p>
+        {% endif %}
+    </section>
+
+    <section>
+        <h2>Organism Detection Records</h2>
+        {% if detections %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Detected Count</th>
+                        <th>Original Image</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in detections %}
+                    <tr>
+                        <td>{{ record["id"] }}</td>
+                        <td>{{ record["username"] or "Unknown" }}</td>
+                        <td>{{ record["detected_count"] }}</td>
+                        <td>{{ record["original_image"] }}</td>
+                        <td>{{ record["created_at"] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p>No organism detection records found.</p>
+        {% endif %}
+    </section>
+
+    <section>
+        <h2>Pollution Detection Records</h2>
+        {% if pollution %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        {% for key in pollution[0].keys() %}
+                            <th>{{ key }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in pollution %}
+                    <tr>
+                        {% for key in record.keys() %}
+                            <td>{{ record[key] }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <p>No pollution records found yet.</p>
+        {% endif %}
+    </section>
+
+</main>
+</body>
+</html>

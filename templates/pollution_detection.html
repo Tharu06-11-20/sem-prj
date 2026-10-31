@@ -1,0 +1,436 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>MarineVision - Pollution Detection</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f0f7fa;
+            color: #17324d;
+        }
+
+        header {
+            background: #063b5c;
+            color: white;
+            padding: 20px 6%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 25px;
+        }
+
+        header a {
+            color: white;
+            text-decoration: none;
+            margin-left: 16px;
+        }
+
+        .container {
+            max-width: 1050px;
+            margin: 35px auto;
+            padding: 0 18px;
+        }
+
+        .panel {
+            background: white;
+            padding: 28px;
+            margin-bottom: 24px;
+            border-radius: 14px;
+            box-shadow: 0 4px 16px rgba(0, 40, 70, 0.08);
+        }
+
+        h2 {
+            color: #075985;
+            margin-top: 0;
+        }
+
+        .description {
+            color: #52677a;
+            line-height: 1.7;
+        }
+
+        .upload-area {
+            border: 2px dashed #69a9c7;
+            background: #f5fbff;
+            padding: 30px 20px;
+            text-align: center;
+            border-radius: 12px;
+        }
+
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            max-width: 500px;
+            margin: 22px auto;
+            padding: 12px;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+        }
+
+        button {
+            background: #087eae;
+            color: white;
+            border: none;
+            padding: 13px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #065f86;
+        }
+
+        .message {
+            padding: 14px 17px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .error {
+            background: #fff0f0;
+            color: #a61b1b;
+            border: 1px solid #f0b4b4;
+        }
+
+        .success {
+            background: #e9f9ef;
+            color: #176534;
+            border: 1px solid #b5e3c2;
+        }
+
+        .warning {
+            background: #fff8e5;
+            color: #805400;
+            border: 1px solid #f1d48b;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 22px;
+        }
+
+        .image-card {
+            min-width: 0;
+            border: 1px solid #dbe6ed;
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .image-card h3 {
+            margin-top: 0;
+            color: #075985;
+        }
+
+        .image-card img {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+            background: #edf3f6;
+            border-radius: 8px;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th, td {
+            padding: 13px;
+            border-bottom: 1px solid #dbe6ed;
+            text-align: left;
+        }
+
+        th {
+            background: #eaf5fa;
+        }
+
+        .empty {
+            padding: 18px;
+            background: #f5f8fa;
+            border-radius: 8px;
+            color: #52677a;
+            line-height: 1.6;
+        }
+
+        .navigation {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 22px;
+        }
+
+        .navigation a {
+            color: #087eae;
+            text-decoration: none;
+            border: 1px solid #b9d9e8;
+            padding: 10px 14px;
+            border-radius: 7px;
+        }
+
+        .navigation a:hover {
+            background: #edf8fc;
+        }
+
+        footer {
+            text-align: center;
+            padding: 24px;
+            color: #647789;
+        }
+
+        @media (max-width: 650px) {
+            header {
+                padding: 18px;
+            }
+
+            header a {
+                margin-left: 0;
+                margin-right: 12px;
+            }
+
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .panel {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>MarineVision</h1>
+
+    <nav>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('pollution_history') }}">History</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+</header>
+
+<main class="container">
+
+    <section class="panel">
+        <h2>Underwater Pollution Detection</h2>
+
+        <p class="description">
+            Upload an underwater image to detect possible marine debris,
+            including plastic waste, bottles, aluminum cans, discarded
+            fishing nets, and tires, according to the classes supported
+            by your trained pollution detection model.
+        </p>
+
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="message warning">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if model_missing %}
+            <div class="message error">
+                <strong>Pollution model not found.</strong>
+                <p>
+                    Check that the trained model exists at:
+                    <code>model/pollution_best.pt</code>
+                </p>
+                <p>
+                    Restart the Flask application after placing the model
+                    in the correct folder.
+                </p>
+            </div>
+        {% else %}
+
+            <form
+                method="POST"
+                action="{{ url_for('pollution_detect') }}"
+                enctype="multipart/form-data"
+            >
+                <div class="upload-area">
+                    <h3>Select an underwater image</h3>
+
+                    <p>
+                        Supported formats: JPG, JPEG, PNG and WEBP.
+                    </p>
+
+                    <input
+                        type="file"
+                        name="image"
+                        id="image"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        required
+                    >
+
+                    <p id="selected-file">
+                        No file selected.
+                    </p>
+
+                    <button type="submit">
+                        Detect Pollution
+                    </button>
+                </div>
+            </form>
+
+        {% endif %}
+    </section>
+
+    {% if result %}
+
+        <section class="panel">
+            <h2>Detection Results</h2>
+
+            <p class="description">
+                Detection record:
+                {{ result["record_id"] }}
+            </p>
+
+            <div class="image-grid">
+
+                <div class="image-card">
+                    <h3>Uploaded Image</h3>
+
+                    <img
+                        src="{{ url_for('static', filename=result['original_image']) }}"
+                        alt="Original uploaded underwater image"
+                    >
+                </div>
+
+                <div class="image-card">
+                    <h3>Pollution Detection Image</h3>
+
+                    <img
+                        src="{{ url_for('static', filename=result['result_image']) }}"
+                        alt="Image annotated by the pollution detection model"
+                    >
+                    <a class="button" href="{{ url_for('download_detection_result', record_type='pollution', record_id=result['record_id']) }}">Download Result</a>
+                </div>
+
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Detected Pollution Objects</h2>
+
+            {% if result["items"] %}
+
+                <p class="success">
+                    The model detected
+                    <strong>{{ result["items"]|length }}</strong>
+                    object(s).
+                </p>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S.No.</th>
+                                <th>Pollution Class</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for item in result["items"] %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+
+                                    <td>
+                                        {{ item["name"] }}
+                                    </td>
+
+                                    <td>
+                                        {{ "%.2f"|format(item["confidence"]) }}%
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            {% else %}
+
+                <div class="message warning">
+                    No pollution objects detected.
+
+                    This does not guarantee that the image is free
+                    from pollution. Try another image or review the
+                    model's confidence threshold.
+                </div>
+
+            {% endif %}
+        </section>
+
+    {% endif %}
+
+    <section class="panel">
+        <h2>More Options</h2>
+
+        <div class="navigation">
+            <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+
+            <a href="{{ url_for('pollution_history') }}">
+                View Pollution History
+            </a>
+
+            <a href="{{ url_for('detect') }}">
+                Marine Organism Detection
+            </a>
+
+        </div>
+    </section>
+
+</main>
+
+<footer>
+    MarineVision — Underwater Marine Organism and Pollution Detection
+</footer>
+
+<script>
+    const imageInput = document.getElementById("image");
+    const selectedFile = document.getElementById("selected-file");
+
+    if (imageInput && selectedFile) {
+        imageInput.addEventListener("change", function () {
+            if (this.files && this.files.length > 0) {
+                selectedFile.textContent =
+                    "Selected file: " + this.files[0].name;
+            } else {
+                selectedFile.textContent = "No file selected.";
+            }
+        });
+    }
+</script>
+
+</body>
+</html>

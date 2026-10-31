@@ -1,0 +1,466 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>MarineVision - Detection History</title>
+
+    <meta name="description"
+          content="View, review and download MarineVision organism detection results.">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 25px;
+            font-family: Arial, sans-serif;
+            background: #f2f8f7;
+            color: #164653;
+        }
+
+        .container {
+            max-width: 1150px;
+            margin: 20px auto;
+        }
+
+        .header {
+            padding: 25px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 60, 60, 0.07);
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #07877f;
+        }
+
+        .subtitle {
+            color: #64777b;
+            line-height: 1.6;
+        }
+
+        .navigation {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 11px 16px;
+            border-radius: 8px;
+            background: #07877f;
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .button:hover {
+            background: #066c67;
+        }
+
+        .secondary {
+            background: #e3f5f1;
+            color: #08786f;
+        }
+
+        .secondary:hover {
+            background: #d0ebe5;
+        }
+
+        .download-button {
+            background: #1769aa;
+        }
+
+        .download-button:hover {
+            background: #125487;
+        }
+
+        .message {
+            padding: 13px 16px;
+            margin: 18px 0;
+            border-radius: 8px;
+            background: #e3f5ec;
+            color: #164653;
+            line-height: 1.5;
+        }
+
+        .history-card {
+            margin-top: 25px;
+            padding: 24px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 60, 60, 0.07);
+        }
+
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            border-bottom: 1px solid #e1ece9;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .record-header h2 {
+            margin: 0;
+            color: #07877f;
+            font-size: 21px;
+        }
+
+        .record-date {
+            color: #64777b;
+            font-size: 14px;
+        }
+
+        .record-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .detail-box {
+            flex: 1;
+            min-width: 150px;
+            padding: 14px;
+            background: #f2f8f7;
+            border-radius: 9px;
+        }
+
+        .detail-label {
+            display: block;
+            margin-bottom: 6px;
+            color: #64777b;
+            font-size: 13px;
+        }
+
+        .detail-value {
+            font-size: 17px;
+            font-weight: bold;
+            color: #164653;
+        }
+
+        .images {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .image-panel {
+            padding: 14px;
+            border: 1px solid #e1ece9;
+            border-radius: 10px;
+            background: #fbfdfd;
+        }
+
+        .image-panel h3 {
+            margin-top: 0;
+            color: #07877f;
+            font-size: 17px;
+        }
+
+        .result-image {
+            display: block;
+            width: 100%;
+            height: 260px;
+            object-fit: contain;
+            background: #edf3f2;
+            border-radius: 8px;
+        }
+
+        .items-section {
+            margin-top: 25px;
+        }
+
+        .items-section h3 {
+            color: #07877f;
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #e1ece9;
+            text-align: left;
+        }
+
+        th {
+            background: #edf8f6;
+            color: #164653;
+        }
+
+        .empty {
+            margin-top: 25px;
+            padding: 35px 20px;
+            text-align: center;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 60, 60, 0.07);
+        }
+
+        .empty h2 {
+            color: #07877f;
+        }
+
+        .record-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 22px;
+        }
+
+        .footer {
+            text-align: center;
+            margin: 30px 0 10px;
+            color: #64777b;
+            font-size: 13px;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 12px;
+            }
+
+            .history-card {
+                padding: 16px;
+            }
+
+            .result-image {
+                height: 220px;
+            }
+
+            .record-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .record-actions .button {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <header class="header">
+        <h1>MarineVision Detection History</h1>
+
+        <p class="subtitle">
+            View your previous underwater marine organism detections,
+            review the prediction results, and download the result images.
+        </p>
+
+        <nav class="navigation">
+            <a class="button" href="{{ url_for('dashboard') }}">
+                Dashboard
+            </a>
+
+            <a class="button secondary" href="{{ url_for('detect') }}">
+                New Detection
+            </a>
+
+            <a class="button secondary" href="{{ url_for('pollution_history') }}">
+                Pollution History
+            </a>
+        </nav>
+    </header>
+
+    {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+            <div class="message">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if history %}
+
+        {% for entry in history %}
+
+            <section class="history-card">
+
+                <div class="record-header">
+                    <h2>
+                        Detection #{{ entry["record"]["id"] }}
+                    </h2>
+
+                    <span class="record-date">
+                        {{ entry["record"]["created_at"] }}
+                    </span>
+                </div>
+
+                <div class="record-details">
+
+                    <div class="detail-box">
+                        <span class="detail-label">
+                            Detection ID
+                        </span>
+
+                        <span class="detail-value">
+                            #{{ entry["record"]["id"] }}
+                        </span>
+                    </div>
+
+                    <div class="detail-box">
+                        <span class="detail-label">
+                            Detected Organisms
+                        </span>
+
+                        <span class="detail-value">
+                            {{ entry["record"]["detected_count"] }}
+                        </span>
+                    </div>
+
+                </div>
+
+                <div class="images">
+
+                    <div class="image-panel">
+                        <h3>Original Image</h3>
+
+                        {% if entry["record"]["original_image"] %}
+                            <img
+                                class="result-image"
+                                src="{{ url_for('static', filename=entry['record']['original_image']) }}"
+                                alt="Original uploaded image for detection {{ entry['record']['id'] }}"
+                                loading="lazy"
+                            >
+                        {% else %}
+                            <p>Original image is unavailable.</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="image-panel">
+                        <h3>Detection Result</h3>
+
+                        {% if entry["record"]["result_image"] %}
+                            <img
+                                class="result-image"
+                                src="{{ url_for('static', filename=entry['record']['result_image']) }}"
+                                alt="Organism detection result {{ entry['record']['id'] }}"
+                                loading="lazy"
+                            >
+                        {% else %}
+                            <p>Detection result image is unavailable.</p>
+                        {% endif %}
+                    </div>
+
+                </div>
+
+                <div class="items-section">
+                    <h3>Detected Organism Details</h3>
+
+                    {% if entry["items"] %}
+                        <div class="table-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Sl. No.</th>
+                                        <th>Organism Name</th>
+                                        <th>Confidence</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for item in entry["items"] %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+
+                                            <td>
+                                                {{ item["organism_name"] }}
+                                            </td>
+
+                                            <td>
+                                                {% if item["confidence"] is not none %}
+                                                    {{ "%.2f"|format(item["confidence"]|float) }}%
+                                                {% else %}
+                                                    Not available
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p>No individual organism details are available for this record.</p>
+                    {% endif %}
+                </div>
+
+                <div class="record-actions">
+
+                    {% if entry["record"]["result_image"] %}
+                       <a
+    href="{{ url_for(
+        'download_detection_result',
+        record_type='organism',
+        record_id=entry['record']['id']
+    ) }}"
+    class="button download-button">
+    Download Detection Result
+</a>
+                    {% endif %}
+
+                    <a
+                        class="button secondary"
+                        href="{{ url_for('detect') }}"
+                    >
+                        Run Another Detection
+                    </a>
+
+                </div>
+
+            </section>
+
+        {% endfor %}
+
+    {% else %}
+
+        <section class="empty">
+            <h2>No Detection History Found</h2>
+
+            <p>
+                You have not completed any organism detections yet.
+                Upload an underwater image to begin detecting marine organisms.
+            </p>
+
+            <a class="button" href="{{ url_for('detect') }}">
+                Start Detection
+            </a>
+        </section>
+
+    {% endif %}
+
+    <footer class="footer">
+        MarineVision — Underwater Marine Organism Detection System
+    </footer>`
+
+</div>
+</body>
+</html>

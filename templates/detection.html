@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineVision - Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #f3f7fa; color: #17323c; }
+        .container { max-width: 1000px; margin: 30px auto; padding: 20px; }
+        .panel { background: white; padding: 24px; margin: 20px 0; border-radius: 12px; box-shadow: 0 3px 12px #00000010; }
+        .btn { display: inline-block; background: #087f8c; color: white; padding: 11px 18px; border: 0; border-radius: 6px; text-decoration: none; cursor: pointer; margin: 8px 5px 0 0; }
+        .image-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+        .image-grid img { width: 100%; max-height: 420px; object-fit: contain; border: 1px solid #ddd; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #d8e1e5; padding: 12px; text-align: left; }
+        th { background: #eaf3f5; }
+        .message { padding: 12px; background: #fff1cd; margin: 10px 0; border-radius: 6px; }
+        .muted { color: #5c7179; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>MarineVision</h1>
+        <h2>Underwater Marine Organism Detection</h2>
+        <p class="muted">Upload an image to detect marine organisms using the trained YOLOv8n model.</p>
+
+        {% with messages = get_flashed_messages() %}
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <section class="panel">
+            <h3>Upload an Underwater Image</h3>
+            <form method="POST" enctype="multipart/form-data">
+                <input
+                    type="file"
+                    name="image"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    required
+                >
+                <br>
+                <button type="submit" class="btn">Detect Organisms</button>
+            </form>
+            <p class="muted">Supported formats: JPG, JPEG, PNG and WEBP.</p>
+        </section>
+
+        {% if result_image is defined %}
+            <section class="panel">
+                <h3>Detection Images</h3>
+                <div class="image-grid">
+                    <div>
+                        <h4>Original Image</h4>
+                        <img src="{{ url_for('static', filename=uploaded_image) }}"
+                             alt="Original uploaded underwater image">
+                    </div>
+                    <div>
+                        <h4>Detection Result</h4>
+                        <img src="{{ url_for('static', filename=result_image) }}"
+                             alt="Underwater image with detection boxes">
+                        <a class="btn" href="{{ url_for('download_detection_result', record_type='organism', record_id=record_id) }}">Download Detection Result</a>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h3>Detected Organisms</h3>
+                {% if detections %}
+                    <p>Total detections: <strong>{{ detections|length }}</strong></p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>S. No.</th>
+                                <th>Organism</th>
+                                <th>Confidence</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in detections %}
+                                <tr>
+                                    <td>{{ loop.index }}</td>
+                                    <td>{{ item.name }}</td>
+                                    <td>{{ item.confidence }}%</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>No marine organisms detected. Please try another image.</p>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        <a class="btn" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+        <a class="btn" href="{{ url_for('detection_history') }}">View Detection History</a>
+    </main>
+</body>
+</html>

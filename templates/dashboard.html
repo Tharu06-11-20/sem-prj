@@ -1,0 +1,121 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineVision Dashboard</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f0f7f8;
+            color: #173b45;
+        }
+        header {
+            background: #075b68;
+            color: white;
+            padding: 18px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        header h1 { margin: 0; }
+        nav { display: flex; gap: 15px; flex-wrap: wrap; }
+        nav a { color: white; text-decoration: none; }
+        main { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 22px;
+            box-shadow: 0 3px 12px #00000010;
+        }
+        .card h2 { font-size: 19px; margin-top: 0; }
+        .card p { line-height: 1.6; }
+        .button {
+            display: inline-block;
+            background: #087f8c;
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin: 5px 5px 5px 0;
+        }
+        .message { background: #e5f4f7; padding: 12px; border-radius: 7px; }
+        footer { text-align: center; padding: 20px; color: #55727a; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>MarineVision</h1>
+    <nav>
+        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </nav>
+</header>
+
+<main>
+    <h2>Welcome, {{ name }}!</h2>
+    <p>Monitor marine organisms and identify potential marine pollution.</p>
+
+    {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+            <p class="message">{{ message }}</p>
+        {% endfor %}
+    {% endwith %}
+
+    <section class="cards">
+        <div class="card">
+            <h2>Marine Organism Detection</h2>
+            <p>Upload an image to identify marine organisms.</p>
+            <a class="button" href="{{ url_for('detect') }}">Detect Organisms</a>
+            <a class="button" href="{{ url_for('detection_history') }}">View History</a>
+        </div>
+
+        <div class="card">
+            <h2>Marine Pollution Detection</h2>
+            <p>Identify visible marine debris in underwater images.</p>
+            <a class="button" href="{{ url_for('pollution_detect') }}">Detect Pollution</a>
+            <a class="button" href="{{ url_for('pollution_history') }}">View History</a>
+        </div>
+
+        {% if role == 'org_member' %}
+        <div class="card">
+            <h2>Team Workspace</h2>
+            <p>View your team and use your organization's shared download quota.</p>
+            <a class="button" href="{{ url_for('organization_team') }}">Team Page</a>
+            <a class="button" href="{{ url_for('feedback') }}">Feedback and Suggestions</a>
+            <a class="button" href="{{ url_for('my_profile') }}">Profile</a>
+        </div>
+        {% endif %}
+
+        {% if role == 'developer' %}
+        <div class="card"><h2>Personal Analytics</h2><p>Review your individual detection totals.</p><a class="button" href="{{ url_for('personal_analytics') }}">View Analytics</a></div>
+        <div class="card"><h2>Feedback and Suggestions</h2><p>Send feedback about MarineVision.</p><a class="button" href="{{ url_for('feedback') }}">Give Feedback</a></div>
+        <div class="card"><h2>Profile</h2><p>View your account profile.</p><a class="button" href="{{ url_for('my_profile') }}">View Profile</a></div>
+        {% endif %}
+    </section>
+
+    {% if role == 'org_member' %}
+    <section class="card" style="margin-top:22px">
+        <h2>Organization Announcements</h2>
+        {% if announcements %}{% for announcement in announcements %}
+        <article><h3>{{ announcement['title'] }}</h3><p>{{ announcement['message'] }}</p><small>Posted {{ announcement['created_at'] }}</small></article>
+        {% endfor %}{% else %}<p>No announcements have been posted.</p>{% endif %}
+        <a class="button" href="{{ url_for('organization_announcements') }}">View All Announcements</a>
+    </section>
+    {% endif %}
+
+</main>
+
+<footer>MarineVision — Underwater Marine Organism and Pollution Detection</footer>
+</body>
+</html>

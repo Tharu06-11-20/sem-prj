@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineVision | Login</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 22px; font-family: Arial, sans-serif; background: #eef5f7; color: #18313b; }
+        .box { width: 100%; max-width: 430px; background: #fff; padding: 30px; border-radius: 14px; box-shadow: 0 5px 22px rgba(0,0,0,.09); }
+        h1 { margin-top: 0; color: #075985; }
+        p { line-height: 1.5; }
+        label { display: block; margin: 15px 0 7px; font-weight: 600; }
+        input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 7px; font-size: 16px; }
+        button { width: 100%; margin-top: 20px; padding: 12px; border: 0; border-radius: 7px; background: #075985; color: white; font-size: 16px; font-weight: 700; cursor: pointer; }
+        button:hover { background: #0c4a6e; }
+        .message { padding: 10px 12px; border-radius: 7px; background: #e0f2fe; margin: 10px 0; }
+        .links { margin-top: 18px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        a { color: #075985; }
+        .forgot { display: block; margin-top: 14px; text-align: right; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <main class="box">
+        <h1>MarineVision</h1>
+        <p>Sign in to your account.</p>
+        {% with messages = get_flashed_messages() %}
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        <form method="post" action="{{ url_for('login') }}">
+            <label for="username">Username</label>
+            <input id="username" name="username" autocomplete="username" required>
+            <label for="password">Password</label>
+            <input id="password" type="password" name="password" autocomplete="current-password" required>
+            <button type="submit">Sign In</button>
+        </form>
+        <a class="forgot" href="{{ url_for('forgot_password') }}">Forgot Password?</a>
+        <div class="links">
+            <a href="{{ url_for('register') }}">Create an account</a>
+            <a href="{{ url_for('admin_login') }}">Admin login</a>
+        </div>
+    </main>
+</body>
+</html>

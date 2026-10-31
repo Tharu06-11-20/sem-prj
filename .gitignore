@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+venv/
+.venv/
+env/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.*
+
+# Local databases and temporary backups
+*.db
+*.sqlite
+*.sqlite3
+tmpsao*.db
+*.bak
+*.tmp
+*.temp
+~$*
+
+# Generated uploads and detections
+static/uploads/*
+static/results/*
+static/pollution_results/*
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,212 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineVision - Subscription Plans</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 25px;
+            font-family: Arial, sans-serif;
+            background: #f2f8f7;
+            color: #164653;
+        }
+
+        .container {
+            max-width: 850px;
+            margin: 25px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 5px 20px rgba(0, 60, 60, 0.08);
+        }
+
+        h1, h2 { color: #07877f; }
+        h1 { text-align: center; }
+
+        .intro {
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .status {
+            margin: 24px 0;
+            padding: 18px;
+            background: #edf8f6;
+            border-radius: 10px;
+            line-height: 1.8;
+        }
+
+        .plans {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+            margin: 20px 0;
+        }
+
+        .plan {
+            padding: 16px;
+            background: #f5faf9;
+            border: 1px solid #d7e9e5;
+            border-radius: 10px;
+        }
+
+        .plan h3 { margin-top: 0; }
+        .price { font-size: 21px; font-weight: bold; }
+
+        label {
+            display: block;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 13px;
+            margin-top: 8px;
+            border: 1px solid #ccd9d7;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        button, .button {
+            display: inline-block;
+            padding: 13px 18px;
+            margin-top: 20px;
+            border: none;
+            border-radius: 8px;
+            background: #07877f;
+            color: white;
+            font-size: 15px;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        button { width: 100%; }
+        button:hover, .button:hover { background: #066c67; }
+
+        .message {
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 8px;
+            background: #e3f5ec;
+        }
+
+        .note {
+            margin-top: 18px;
+            color: #64777b;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .back {
+            display: block;
+            margin-top: 20px;
+            text-align: center;
+            color: #07877f;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>MarineVision Subscription</h1>
+    <p class="intro">
+        Manage your organization's subscription and shared download allowance.
+    </p>
+
+    {% with messages = get_flashed_messages() %}
+        {% for message in messages %}
+            <div class="message">{{ message }}</div>
+        {% endfor %}
+    {% endwith %}
+
+    {% if subscription is defined and subscription %}
+    <section class="status">
+        <h2>Current Subscription</h2>
+        <p>
+            <strong>Organization:</strong>
+            {{ subscription["organization_name"] }}
+        </p>
+        <p>
+            <strong>Payment Status:</strong>
+            {{ subscription["payment_status"] }}
+        </p>
+        <p>
+            <strong>Download Limit:</strong>
+            {{ subscription["download_limit"] }}
+        </p>
+        {% if used_downloads is defined %}
+        <p>
+            <strong>Downloads Used:</strong>
+            {{ used_downloads }}
+        </p>
+        <p>
+            <strong>Downloads Remaining:</strong>
+            {{ [subscription["download_limit"] - used_downloads, 0]|max }}
+        </p>
+        {% endif %}
+        {% if subscription["is_blocked"] %}
+        <p><strong>Status:</strong> Blocked by administrator</p>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    <h2>Available Plans</h2>
+    <div class="plans">
+        <div class="plan">
+            <h3>1 Month</h3>
+            <p class="price">₹500</p>
+        </div>
+        <div class="plan">
+            <h3>3 Months</h3>
+            <p class="price">₹1,200</p>
+        </div>
+        <div class="plan">
+            <h3>6 Months</h3>
+            <p class="price">₹2,200</p>
+        </div>
+        <div class="plan">
+            <h3>12 Months</h3>
+            <p class="price">₹4,000</p>
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('subscription') }}">
+        <label for="organization_name">Organization Name</label>
+        <input
+            type="text"
+            id="organization_name"
+            name="organization_name"
+            value="{{ subscription['organization_name'] if subscription is defined and subscription else '' }}"
+            placeholder="Enter your organization name"
+            required
+        >
+
+        <label for="duration">Subscription Duration</label>
+        <select id="duration" name="duration" required>
+            <option value="">-- Select a Plan --</option>
+            <option value="1">1 Month - ₹500</option>
+            <option value="3">3 Months - ₹1,200</option>
+            <option value="6">6 Months - ₹2,200</option>
+            <option value="12">12 Months - ₹4,000</option>
+        </select>
+
+        <button type="submit">Continue to Payment</button>
+    </form>
+
+    <p class="note">
+        Payment processing is not connected to an external payment provider.
+        Only a subscription recorded as successfully paid by your application
+        should grant service access. A renewal should create or activate a
+        valid subscription according to the backend logic.
+    </p>
+
+    <a class="back" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</div>
+</body>
+</html>

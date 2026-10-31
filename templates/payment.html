@@ -1,0 +1,172 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarineVision - Payment Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 25px;
+            font-family: Arial, sans-serif;
+            background: #f2f8f7;
+            color: #164653;
+        }
+
+        .container {
+            max-width: 650px;
+            margin: 25px auto;
+            padding: 30px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 5px 20px rgba(0, 60, 60, 0.08);
+        }
+
+        h1 {
+            text-align: center;
+            color: #07877f;
+        }
+
+        .summary {
+            padding: 20px;
+            margin: 22px 0;
+            background: #f2f8f7;
+            border-radius: 10px;
+        }
+
+        .detail {
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .amount {
+            font-size: 25px;
+            font-weight: bold;
+            color: #07877f;
+        }
+
+        label {
+            display: block;
+            margin: 20px 0 8px;
+            font-weight: bold;
+        }
+
+        select {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ccd9d7;
+            border-radius: 8px;
+            font-size: 16px;
+            background: white;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            margin-top: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .primary {
+            background: #07877f;
+            color: white;
+        }
+
+        .secondary {
+            background: #e9eff0;
+            color: #164653;
+        }
+
+        .note {
+            margin-top: 20px;
+            color: #64777b;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .back {
+            display: block;
+            margin-top: 22px;
+            text-align: center;
+            color: #07877f;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Payment Management</h1>
+
+    <p style="text-align:center">
+        Review your subscription details and select a payment method.
+    </p>
+
+    <div class="summary">
+        <div class="detail">
+            <span>Organization</span>
+            <strong>{{ subscription["organization_name"] }}</strong>
+        </div>
+
+        <div class="detail">
+            <span>Subscription Duration</span>
+            <strong>{{ subscription["duration_months"] }} month(s)</strong>
+        </div>
+
+        <div class="detail">
+            <span>Amount</span>
+            <span class="amount">
+                ₹{{ "%.2f"|format(subscription["amount"]) }}
+            </span>
+        </div>
+
+        <div class="detail">
+            <span>Payment Status</span>
+            <strong>{{ subscription["payment_status"] }}</strong>
+        </div>
+    </div>
+
+    <form method="POST"
+          action="{{ url_for('payment', subscription_id=subscription['id']) }}">
+
+        <label for="payment_method">Payment Method</label>
+        <select id="payment_method" name="payment_method" required>
+            <option value="">-- Select Payment Method --</option>
+            <option value="UPI">UPI</option>
+            <option value="Card">Debit / Credit Card</option>
+            <option value="Net Banking">Net Banking</option>
+        </select>
+
+        <button class="primary" type="submit"
+                name="payment_action" value="success">
+            Confirm Payment
+        </button>
+
+        <button class="secondary" type="submit"
+                name="payment_action" value="failure">
+            Cancel Transaction
+        </button>
+    </form>
+
+    <p class="note">
+        This version records an internal transaction outcome only.
+        No bank, card network, UPI service, or external payment provider
+        is contacted. Do not enter actual bank or card credentials.
+    </p>
+
+    <a class="back" href="{{ url_for('dashboard') }}">
+        Back to Organization Dashboard
+    </a>
+</div>
+</body>
+</html>
