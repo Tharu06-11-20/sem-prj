@@ -3,3 +3,4 @@ Werkzeug
 Pillow
 ultralytics
 itsdangerous
+gunicorn==23.0.0
