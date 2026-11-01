@@ -4,11 +4,34 @@ import io
 import textwrap
 import uuid
 import sqlite3
+import threading
+import gc
+import time
 from datetime import datetime, timedelta
 import smtplib
 import ssl
 from email.message import EmailMessage
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+
+# Configure environment BEFORE importing PyTorch / Ultralytics / OpenCV
+# Render free tier provides 512MB RAM and fractional CPU.
+# Forcing single-thread CPU execution prevents thread stack exhaustion (saving ~250MB RAM)
+# and eliminates CPU lock contention across multi-core container hosts.
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["YOLO_VERBOSE"] = "False"
+
+import torch
+torch.set_num_threads(1)
+try:
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    pass
+torch.set_grad_enabled(False)
 
 from flask import (
     Flask, render_template, request, redirect,
@@ -16,8 +39,9 @@ from flask import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-from PIL import Image
+from PIL import Image, ImageOps
 PIL_IMAGE_OPEN = Image.open
+import numpy as np
 from ultralytics import YOLO
 
 
@@ -38,6 +62,8 @@ POLLUTION_RESULT_FOLDER = os.path.join(BASE_DIR, "static", "pollution_results")
 
 # Predictions below this confidence are excluded by YOLO.
 MODEL_CONFIDENCE_THRESHOLD = 0.25
+UNUSUAL_CONFIDENCE_THRESHOLD = 0.45
+MAX_IMAGE_DIMENSION = 1280
 
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 PLANS = {1: 500, 3: 1200, 6: 2200, 12: 4000}
@@ -47,15 +73,117 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULT_FOLDER, exist_ok=True)
 os.makedirs(POLLUTION_RESULT_FOLDER, exist_ok=True)
 
-# Load the existing marine-organism model. Keep best.pt unchanged.
-model = YOLO(MODEL_PATH)
+# Thread-safe model managers with single-load per worker and warmup
+_model_lock = threading.Lock()
+_organism_model = None
+_pollution_model = None
 
-# Pollution model is optional until debris training has finished.
-pollution_model = (
-    YOLO(POLLUTION_MODEL_PATH)
-    if os.path.isfile(POLLUTION_MODEL_PATH)
-    else None
-)
+
+def get_organism_model():
+    """Return the marine organism YOLO model, loading and warming it up if needed."""
+    global _organism_model, model
+    if _organism_model is None:
+        with _model_lock:
+            if _organism_model is None:
+                if not os.path.isfile(MODEL_PATH):
+                    app.logger.error("Organism model file not found at: %s", MODEL_PATH)
+                    return None
+                app.logger.info("Loading marine organism model from: %s", MODEL_PATH)
+                loaded = YOLO(MODEL_PATH)
+                # Warm up predictor to avoid cold-start timeout/OOM during user requests
+                try:
+                    dummy = np.zeros((320, 320, 3), dtype=np.uint8)
+                    _ = loaded.predict(source=dummy, imgsz=320, device="cpu", verbose=False)
+                    del dummy
+                except Exception as warmup_err:
+                    app.logger.warning("Organism model warmup note: %s", warmup_err)
+                gc.collect()
+                _organism_model = loaded
+                model = _organism_model
+                app.logger.info("Organism model ready.")
+    return _organism_model
+
+
+def get_pollution_model():
+    """Return the marine pollution YOLO model, loading and warming it up if needed."""
+    global _pollution_model, pollution_model
+    if _pollution_model is None:
+        with _model_lock:
+            if _pollution_model is None:
+                if not os.path.isfile(POLLUTION_MODEL_PATH):
+                    app.logger.warning("Pollution model file not found at: %s", POLLUTION_MODEL_PATH)
+                    return None
+                app.logger.info("Loading marine pollution model from: %s", POLLUTION_MODEL_PATH)
+                loaded = YOLO(POLLUTION_MODEL_PATH)
+                try:
+                    dummy = np.zeros((320, 320, 3), dtype=np.uint8)
+                    _ = loaded.predict(source=dummy, imgsz=320, device="cpu", verbose=False)
+                    del dummy
+                except Exception as warmup_err:
+                    app.logger.warning("Pollution model warmup note: %s", warmup_err)
+                gc.collect()
+                _pollution_model = loaded
+                pollution_model = _pollution_model
+                app.logger.info("Pollution model ready.")
+    return _pollution_model
+
+
+# Initialize module-level references and preload models on startup
+model = None
+pollution_model = None
+
+try:
+    model = get_organism_model()
+except Exception as init_err:
+    app.logger.warning("Initial organism model preload deferred: %s", init_err)
+
+try:
+    pollution_model = get_pollution_model()
+except Exception as init_err:
+    app.logger.warning("Initial pollution model preload deferred: %s", init_err)
+
+
+def preprocess_and_save_upload(file_storage, target_path, max_dim=MAX_IMAGE_DIMENSION):
+    """
+    Saves and validates an uploaded image file safely.
+    - Verifies file integrity using Pillow.
+    - Transposes EXIF orientation.
+    - Converts RGBA, LA, or Palette modes to RGB (handling transparency with white bg).
+    - If either dimension exceeds max_dim, resizes proportionally using high-quality downsampling.
+    - Saves clean JPEG to target_path with quality=90.
+    Returns (True, None) on success or (False, error_reason) on failure.
+    """
+    temp_path = target_path + ".tmp"
+    try:
+        file_storage.save(temp_path)
+        with Image.open(temp_path) as raw:
+            raw.verify()
+
+        with Image.open(temp_path) as img:
+            img = ImageOps.exif_transpose(img)
+            if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                img = img.convert("RGBA")
+                bg = Image.new("RGB", img.size, (255, 255, 255))
+                bg.paste(img, mask=img.split()[3])
+                img = bg
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+
+            if max(img.size) > max_dim:
+                app.logger.info("Downsampling large image from %s to max_dim %d", img.size, max_dim)
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+
+            img.save(target_path, format="JPEG", quality=90)
+        return True, None
+    except Exception as err:
+        app.logger.warning("Image validation/preprocessing failed: %s", err)
+        return False, str(err)
+    finally:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 
 def get_db_connection():
@@ -161,6 +289,21 @@ def create_table():
             result_image TEXT NOT NULL,
             detected_count INTEGER NOT NULL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    """)
+
+    # Images that need human review if confidence is low.
+    connection.execute("""
+        CREATE TABLE IF NOT EXISTS unusual_creatures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            image_path TEXT NOT NULL,
+            predicted_class TEXT,
+            confidence REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'Needs review',
+            notes TEXT,
+            created_at TEXT DEFAULT (datetime('now', 'localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     """)
@@ -1213,58 +1356,63 @@ def detect():
             flash("Upload a JPG, JPEG, PNG, or WEBP image.")
             return redirect(url_for("detect"))
 
-        safe_filename = secure_filename(file.filename)
+        current_model = get_organism_model()
+        if current_model is None:
+            flash("Marine organism detection model is currently unavailable. Please check the server logs.")
+            return redirect(url_for("detect"))
 
         # Generate unique names so uploaded files are not overwritten.
         unique_name = uuid.uuid4().hex
-        extension = safe_filename.rsplit(".", 1)[1].lower()
-
-        original_filename = f"{unique_name}.{extension}"
+        original_filename = f"{unique_name}.jpg"
         result_filename = f"{unique_name}_result.jpg"
 
         image_path = os.path.join(UPLOAD_FOLDER, original_filename)
         result_path = os.path.join(RESULT_FOLDER, result_filename)
 
         connection = None
-        image_validated = False
+        t_start = time.time()
+
+        # Validate and preprocess image (resizes large dimensions, handles orientation & RGBA)
+        ok, err_msg = preprocess_and_save_upload(file, image_path)
+        if not ok:
+            app.logger.warning("Upload validation failed for %s: %s", file.filename, err_msg)
+            flash("The uploaded file is not a readable supported image. Please upload a valid JPG, PNG, or WEBP file.")
+            return redirect(url_for("detect"))
 
         try:
-            file.save(image_path)
-
-            # Check that the uploaded file is a readable image.
-            with PIL_IMAGE_OPEN(image_path) as image:
-                image.verify()
-            image_validated = True
-
-            # Run the trained YOLO model.
-            prediction = model.predict(
+            # Run the trained YOLO model with explicit CPU, imgsz=640 and confidence threshold
+            t_infer_start = time.time()
+            prediction = current_model.predict(
                 source=image_path,
                 conf=MODEL_CONFIDENCE_THRESHOLD,
+                imgsz=640,
+                device="cpu",
                 verbose=False
             )[0]
+            t_infer = time.time() - t_infer_start
 
-            # Save the annotated image with bounding boxes.
+            # Save the annotated image with bounding boxes
             annotated_image = prediction.plot()
+            result_img = Image.fromarray(annotated_image[:, :, ::-1])
+            result_img.save(result_path, format="JPEG", quality=85, optimize=True)
 
-            # YOLO returns a BGR image; convert it to RGB before saving.
-            Image.fromarray(annotated_image[:, :, ::-1]).save(
-                result_path, format="JPEG"
-            )
+            # Explicitly free intermediate buffers
+            del annotated_image, result_img
 
             detection_items = []
-
             for box in prediction.boxes:
                 class_id = int(box.cls[0].item())
                 confidence = float(box.conf[0].item())
-
                 detection_items.append({
                     "name": prediction.names[class_id],
                     "confidence": round(confidence * 100, 2)
                 })
 
-            # Save detection history in the database.
-            connection = get_db_connection()
+            del prediction
+            gc.collect()
 
+            # Save detection history in the database
+            connection = get_db_connection()
             cursor = connection.execute("""
                 INSERT INTO detections
                 (user_id, original_image, result_image, detected_count)
@@ -1275,7 +1423,6 @@ def detect():
                 "results/" + result_filename,
                 len(detection_items)
             ))
-
             detection_id = cursor.lastrowid
 
             for item in detection_items:
@@ -1289,7 +1436,45 @@ def detect():
                     item["confidence"]
                 ))
 
+            # Flag low confidence or unusual detection for review if applicable
+            if not detection_items:
+                should_flag = True
+                flagged_class = None
+                flagged_confidence = 0.0
+            else:
+                weakest_item = min(
+                    detection_items, key=lambda item: item["confidence"]
+                )
+                should_flag = any(
+                    item["confidence"] < (UNUSUAL_CONFIDENCE_THRESHOLD * 100)
+                    for item in detection_items
+                )
+                flagged_class = weakest_item["name"]
+                flagged_confidence = weakest_item["confidence"] / 100.0
+
+            if should_flag:
+                try:
+                    tbl_check = connection.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='unusual_creatures'"
+                    ).fetchone()
+                    if tbl_check:
+                        connection.execute("""
+                            INSERT INTO unusual_creatures
+                            (user_id, image_path, predicted_class, confidence, status)
+                            VALUES (?, ?, ?, ?, 'Needs review')
+                        """, (
+                            session["user_id"],
+                            "uploads/" + original_filename,
+                            flagged_class,
+                            flagged_confidence
+                        ))
+                except Exception as flag_err:
+                    app.logger.warning("Could not record unusual creature flag: %s", flag_err)
+
             connection.commit()
+            t_total = time.time() - t_start
+            app.logger.info("Organism detection completed in %.2fs (infer: %.2fs, items: %d)",
+                            t_total, t_infer, len(detection_items))
 
             return render_template(
                 "detection.html",
@@ -1299,31 +1484,25 @@ def detect():
                 record_id=detection_id
             )
 
-        except Exception:
-            app.logger.exception("Image detection failed")
-
+        except Exception as e:
+            app.logger.exception("Image detection failed: %s", e)
             if connection is not None:
                 connection.rollback()
 
-            # Remove partial files after a failed detection.
             for path in [image_path, result_path]:
                 if os.path.exists(path):
                     try:
                         os.remove(path)
                     except OSError:
-                        app.logger.warning(
-                            "Could not remove temporary file: %s", path
-                        )
+                        app.logger.warning("Could not remove temporary file: %s", path)
 
-            if image_validated:
-                flash("The image was readable, but detection or result saving failed. Please try again.")
-            else:
-                flash("The uploaded file is not a readable supported image. Please upload a valid JPG, PNG, or WEBP file.")
+            flash("Detection could not be completed. Please try another image.")
             return redirect(url_for("detect"))
 
         finally:
             if connection is not None:
                 connection.close()
+            gc.collect()
 
     return render_template("detection.html")
 
@@ -1377,7 +1556,8 @@ def pollution_detect():
                 return redirect(url_for("subscription"))
             return redirect(url_for("dashboard"))
 
-    if pollution_model is None:
+    current_model = get_pollution_model()
+    if current_model is None:
         return render_template("pollution_detection.html", result=None,
                                model_missing=True)
 
@@ -1395,29 +1575,36 @@ def pollution_detect():
             flash("Upload a JPG, JPEG, PNG, or WEBP image.")
             return redirect(url_for("pollution_detect"))
 
-        safe_filename = secure_filename(file.filename)
-        extension = safe_filename.rsplit(".", 1)[1].lower()
         unique_name = uuid.uuid4().hex
-        original_filename = f"{unique_name}.{extension}"
+        original_filename = f"{unique_name}.jpg"
         result_filename = f"{unique_name}_pollution.jpg"
         image_path = os.path.join(UPLOAD_FOLDER, original_filename)
         result_path = os.path.join(POLLUTION_RESULT_FOLDER, result_filename)
         connection = None
-        image_validated = False
+        t_start = time.time()
+
+        ok, err_msg = preprocess_and_save_upload(file, image_path)
+        if not ok:
+            app.logger.warning("Pollution upload validation failed for %s: %s", file.filename, err_msg)
+            flash("The uploaded file is not a readable supported image. Please upload a valid JPG, PNG, or WEBP file.")
+            return redirect(url_for("pollution_detect"))
 
         try:
-            file.save(image_path)
-            with PIL_IMAGE_OPEN(image_path) as uploaded_image:
-                uploaded_image.verify()
-            image_validated = True
-
-            prediction = pollution_model.predict(
-                source=image_path, conf=MODEL_CONFIDENCE_THRESHOLD, verbose=False
+            t_infer_start = time.time()
+            prediction = current_model.predict(
+                source=image_path,
+                conf=MODEL_CONFIDENCE_THRESHOLD,
+                imgsz=640,
+                device="cpu",
+                verbose=False
             )[0]
+            t_infer = time.time() - t_infer_start
+
             annotated_image = prediction.plot()
-            Image.fromarray(annotated_image[:, :, ::-1]).save(
-                result_path, format="JPEG"
-            )
+            result_img = Image.fromarray(annotated_image[:, :, ::-1])
+            result_img.save(result_path, format="JPEG", quality=85, optimize=True)
+
+            del annotated_image, result_img
 
             items = []
             for box in prediction.boxes:
@@ -1427,6 +1614,9 @@ def pollution_detect():
                     "name": prediction.names[class_id],
                     "confidence": round(confidence, 2)
                 })
+
+            del prediction
+            gc.collect()
 
             connection = get_db_connection()
             cursor = connection.execute("""
@@ -1449,6 +1639,10 @@ def pollution_detect():
                 """, (record_id, item["name"], item["confidence"]))
 
             connection.commit()
+            t_total = time.time() - t_start
+            app.logger.info("Pollution detection completed in %.2fs (infer: %.2fs, items: %d)",
+                            t_total, t_infer, len(items))
+
             result = {
                 "record_id": record_id,
                 "original_image": "uploads/" + original_filename,
@@ -1458,8 +1652,8 @@ def pollution_detect():
             return render_template("pollution_detection.html", result=result,
                                    model_missing=False)
 
-        except Exception:
-            app.logger.exception("Pollution detection failed")
+        except Exception as e:
+            app.logger.exception("Pollution detection failed: %s", e)
             if connection is not None:
                 connection.rollback()
             for path in (image_path, result_path):
@@ -1468,15 +1662,14 @@ def pollution_detect():
                         os.remove(path)
                     except OSError:
                         app.logger.warning("Could not remove file: %s", path)
-            if image_validated:
-                flash("The image was readable, but pollution detection or result saving failed. Please try again.")
-            else:
-                flash("The uploaded file is not a readable supported image. Please upload a valid JPG, PNG, or WEBP file.")
+
+            flash("Pollution detection could not be completed. Please try another image.")
             return redirect(url_for("pollution_detect"))
 
         finally:
             if connection is not None:
                 connection.close()
+            gc.collect()
 
     return render_template("pollution_detection.html", result=None,
                            model_missing=False)
