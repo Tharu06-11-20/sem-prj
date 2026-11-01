@@ -1,6 +1,10 @@
 Flask
-Werkzeug
-Pillow
 ultralytics
+torch
+torchvision
+opencv-python-headless
+Pillow
+numpy
+Werkzeug
 itsdangerous
-gunicorn==23.0.0
+gunicorn
